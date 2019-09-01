@@ -1,0 +1,119 @@
+package dlv;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import core.PawnDLV;
+import core.Position;
+
+public class Intelligence {
+	
+	private List<PawnDLV> blackPawnsDLV = new ArrayList<PawnDLV>();
+	private List<PawnDLV> whitePawnsDLV = new ArrayList<PawnDLV>();
+	private List<Position> emptyPositions = new ArrayList<Position>();
+	
+	public Intelligence() {}
+	
+	public boolean playerCanMove() {
+		
+		List<PawnDLV> adjWhites = new ArrayList<PawnDLV>();
+		List<PawnDLV> pawnsCanMove = new ArrayList<PawnDLV>();
+		<#(program)
+			in=blackPawnsDLV::blacks,whitePawnsDLV::whites,emptyPositions::emptyPos;
+			out=pawnsCanMove::whitesMove,adjWhites::adjW;
+			
+			whitesMove(X,Y,C) :- whites(X,Y,C), emptyPos(K,Z), K=X-1, Z=Y+1.
+			whitesMove(X,Y,C) :- whites(X,Y,C), emptyPos(K,Z), K=X-1, Z=Y-1.
+			
+			whitesMove(X,Y,C) :- whites(X,Y,C), emptyPos(K,Z), K=X+1, Z=Y+1, C=1.
+			whitesMove(X,Y,C) :- whites(X,Y,C), emptyPos(K,Z), K=X+1, Z=Y-1, C=1.
+			
+			//find adjacents
+			adjW(X2,Y2,C2) :- blacks(X1,Y1,C1), whites(X2,Y2,C2), X1=X2+1, Y1=Y2+1, emptyPos(K,Z), K=X2+2, Z=Y2+2, C2=1.
+			adjW(X2,Y2,C2) :- blacks(X1,Y1,C1), whites(X2,Y2,C2), X1=X2+1, Y1=Y2-1, emptyPos(K,Z), K=X2+2, Z=Y2-2, C2=1.
+			
+			adjW(X2,Y2,C2) :- blacks(X1,Y1,C1), whites(X2,Y2,C2), X1=X2-1, Y1=Y2+1, emptyPos(K,Z), K=X2-2, Z=Y2+2, C2=1.
+			adjW(X2,Y2,C2) :- blacks(X1,Y1,C1), whites(X2,Y2,C2), X1=X2-1, Y1=Y2-1, emptyPos(K,Z), K=X2-2, Z=Y2-2, C2=1.
+			
+			adjW(X2,Y2,C2) :- blacks(X1,Y1,C1), whites(X2,Y2,C2), X1=X2-1, Y1=Y2+1, emptyPos(K,Z), K=X2-2, Z=Y2+2, C1=0, C2=0.
+			adjW(X2,Y2,C2) :- blacks(X1,Y1,C1), whites(X2,Y2,C2), X1=X2-1, Y1=Y2-1, emptyPos(K,Z), K=X2-2, Z=Y2-2, C1=0, C2=0.
+		#>
+		if_no_answerset {
+			System.out.println("no_answerset");
+		} catch_error {
+			System.err.println("error");
+		}
+		return !(pawnsCanMove.isEmpty() && adjWhites.isEmpty());	
+	}
+	
+	public List<PawnDLV> getResult() {
+		
+		List<PawnDLV> result = new ArrayList<PawnDLV>();
+		<#(program)
+			in=blackPawnsDLV::blacks, whitePawnsDLV::whites, emptyPositions::empty;
+			out=result::inRes;
+			board(7).
+			//GUESS
+			outRes(X,Y,C) | inRes(X,Y,C) :- blacks(X,Y,C).
+			//PAWN ADJ
+			canTake(X1,Y1,C1) :- blacks(X1,Y1,C1), whites(X2,Y2,C2), X2=X1+1, Y2=Y1+1, empty(K,Z), K=X2+1, Z=Y2+1, C1=0, C2=0.
+			canTake(X1,Y1,C1) :- blacks(X1,Y1,C1), whites(X2,Y2,C2), X2=X1+1, Y2=Y1-1, empty(K,Z), K=X2+1, Z=Y2-1, C1=0, C2=0.
+			//CHECKER ADJ
+			canTake(X1,Y1,C1) :- blacks(X1,Y1,C1), whites(X2,Y2,C2), X2=X1+1, Y2=Y1+1, empty(K,Z), K=X2+1, Z=Y2+1, C1=1.
+			canTake(X1,Y1,C1) :- blacks(X1,Y1,C1), whites(X2,Y2,C2), X2=X1+1, Y2=Y1-1, empty(K,Z), K=X2+1, Z=Y2-1, C1=1.
+			canTake(X1,Y1,C1) :- blacks(X1,Y1,C1), whites(X2,Y2,C2), X2=X1-1, Y2=Y1+1, empty(K,Z), K=X2-1, Z=Y2+1, C1=1.
+			canTake(X1,Y1,C1) :- blacks(X1,Y1,C1), whites(X2,Y2,C2), X2=X1-1, Y2=Y1-1, empty(K,Z), K=X2-1, Z=Y2-1, C1=1.
+			//SALVO LE POSIZIONI DELLE PEDINE CHE POSSONO EFFETTUARE UNA MANGIATA
+			tmp(X,Y) :- canTake(X,Y,_).
+			//JUMP
+			canJump(X,Y,C) :- blacks(X,Y,C), empty(K,Z), K=X+1, Z=Y+1, not canTake(X,Y,C).
+			canJump(X,Y,C) :- blacks(X,Y,C), empty(K,Z), K=X+1, Z=Y-1, not canTake(X,Y,C).
+			canJump(X,Y,C) :- blacks(X,Y,C), empty(K,Z), K=X-1, Z=Y+1, C=1, not tmp(X,Y).
+			canJump(X,Y,C) :- blacks(X,Y,C), empty(K,Z), K=X-1, Z=Y-1, C=1, not tmp(X,Y).
+			canJump(X,Y,C) :- blacks(X,Y,C), empty(K,Z), K=X+1, Z=Y+1, C=1, not tmp(X,Y).
+			canJump(X,Y,C) :- blacks(X,Y,C), empty(K,Z), K=X+1, Z=Y-1, C=1, not tmp(X,Y).
+			//SALVO PER OGNI PAWN I SUOI POSSIBILI SALTI
+			allJump(X,Y,C,K,Z) :- canJump(X,Y,C), empty(K,Z), K=X+1, Z=Y+1.
+			allJump(X,Y,C,K,Z) :- canJump(X,Y,C), empty(K,Z), K=X+1, Z=Y-1. 
+			allJump(X,Y,1,K,Z) :- canJump(X,Y,1), empty(K,Z), K=X-1, Z=Y+1. 
+			allJump(X,Y,1,K,Z) :- canJump(X,Y,1), empty(K,Z), K=X-1, Z=Y-1.
+			
+			//STRONG CONSTRAINTS
+			//Escludo gli A.S dove non ho 'inRes' come vero
+			:- #count{X,Y:inRes(X,Y,_)}=0.
+			//Escludo gli A.S dove non ho 'canJump'  
+			:- inRes(X,Y,C), not canJump(X,Y,C), #count{K,Z:canTake(K,Z,_)}=0.
+			
+			//WEAK CONSTRAINTS
+			:~ canJump(X,Y,1), inRes(X,Y,_). [1:5]
+			//Preferisco gli A.S dove ho il numero di 'canJump' maggiore
+			:~ canJump(X,Y,_), outRes(X,Y,_), #count{K,Z:canTake(K,Z,_)}=0. [1:4]
+			//Preferisco gli A.S dove una pedine può diventare dama in meno salti possibili
+			:~ canJump(X,Y,_), inRes(X,Y,_), board(B), W=B-X. [W:4]
+			//Preferisco gli A.S dove un 'canJump' dopo il salto non viene mangiato
+			:~ inRes(X,Y,C1), allJump(X,Y,C1,K,Z), whites(F,G,C2), C1 <= C2, #absdiff(K,F,D1), #absdiff(Z,G,D2), D1 = 1, D2 = 1. [1:3]
+			//Preferisco gli A.S dove posso mangiare
+			:~ canJump(X,Y,_), inRes(X,Y,_). [1:2]
+			//Preferisco gli A.S dove ho il numero di 'canTake' maggiore
+			:~ canTake(X,Y,_), outRes(X,Y,_). [1:1]
+			//serve nel caso in cui ho solo pedine che effettuano la mangiata
+			:~ inRes(X,Y,C), not canJump(X,Y,C). [1:1] 
+		#>
+		if_no_answerset {
+			System.out.println("no_answerset");
+		}
+		return result;
+	}
+	
+	public void setWhitePawnsDLV(List<PawnDLV> whitePawnsDLV) {
+		this.whitePawnsDLV = whitePawnsDLV;
+	}
+	
+	public void setBlackPawnsDLV(List<PawnDLV> blackPawnsDLV) {
+		this.blackPawnsDLV = blackPawnsDLV;
+	}  
+	
+	public void setEmptyPositions(List<Position> emptyPositions) {
+		this.emptyPositions = emptyPositions;
+	}
+}
