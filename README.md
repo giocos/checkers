@@ -1,3 +1,6 @@
 # checkers
-JAVA 1.5
+DLV
+
+JAVA >= 1.5
+
 ECLIPSE JUNO
